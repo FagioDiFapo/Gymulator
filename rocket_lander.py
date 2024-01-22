@@ -17,8 +17,8 @@ from sys import exit
 
 class Thing:
         DEFAULT_COLOR = (255, 255, 255)
-        position = (0, 0)
-        rotation = 0
+        position = (0., 0.)
+        rotation = 0.
         def __init__(self, vertices = [(-1,1),(1,1),(1,-1),(-1,-1)], color = DEFAULT_COLOR):
             self.vertices = vertices
             self.color = color
@@ -41,12 +41,20 @@ class Thing:
             transform_function = self.create_transform(resolution)
             pygame.draw.polygon(display, self.color, list(map(transform_function, self.vertices)))
 
+class Rocket(Thing):
+    def __init__(self, width, height):
+        hwidth = width/2
+        hheight = height/2
+        vertices = [(-hwidth,hheight),(hwidth,hheight),(hwidth,-hheight),(-hwidth,-hheight)]
+        super(Rocket, self).__init__(vertices)
+
+
 class RocketLander(gym.Env):
 
-    BACKGROUND_COLOR = (0, 0, 0)
+    BACKGROUND_COLOR = (100, 100, 150)
     WINDOW_WIDTH = 800
-    WINDOW_HEIGHT = 400
-    RESOLUTION = 100 #in pixels per meter
+    WINDOW_HEIGHT = 600
+    RESOLUTION = 10 #in pixels per meter
 
     running = True
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -55,7 +63,7 @@ class RocketLander(gym.Env):
     things = []
 
     def __init__(self):
-        self.things.append(Thing())
+        self.things.append(Rocket(3.7,47.7))
         self.things[0].position = (200, 200)
         self.things[0].rotation = math.pi/4
 
