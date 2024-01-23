@@ -15,45 +15,66 @@ import pygame
 import math
 from sys import exit
 
-class Thing:
-        DEFAULT_COLOR = (255, 255, 255)
-        position = (0., 0.)
-        rotation = 0.
-        def __init__(self, vertices = [(-1,1),(1,1),(1,-1),(-1,-1)], color = DEFAULT_COLOR):
-            self.vertices = vertices
-            self.color = color
+class Polygon:
+    DEFAULT_COLOR = (255, 255, 255)
 
-        def transform(self, position, resolution):
-            x = position[0]
-            y = position[1]
-            (x, y) = (x*resolution, y*resolution)
-            (x, y) = (x*math.cos(self.rotation)-y*math.sin(self.rotation), x*math.sin(self.rotation) + y*math.cos(self.rotation))
-            (x, y) = (self.position[0]+x, self.position[1]+y)
-            return (x, y)
+    def __init__(self, vertices = [[-1,1],[1,1],[1,-1],[-1,-1]], color = DEFAULT_COLOR):
+        self.vertices = vertices
+        self.color = color
 
-        def create_transform(self, resolution):
-            def transform_with_scale(position):
-                return self.transform(position, resolution)
-            return transform_with_scale
+    def transform(self, resolution, displacement, rotation, vertex):
+        x = vertex[0]
+        y = vertex[1]
+        [x, y] = [x*resolution, y*resolution]
+        [x, y] = [x*math.cos(rotation)-y*math.sin(rotation), x*math.sin(rotation)+y*math.cos(rotation)]
+        [x, y] = [displacement[0]*resolution+x, displacement[1]*resolution+y]
+        return [x, y]
+
+    def create_transform(self, resolution, displacement, rotation):
+        def adapted_transform(vertex):
+            return self.transform(resolution, displacement, rotation, vertex)
+        return adapted_transform
 
 
-        def draw(self, display, resolution):
-            transform_function = self.create_transform(resolution)
-            pygame.draw.polygon(display, self.color, list(map(transform_function, self.vertices)))
+    def draw(self, display, resolution, displacement, rotation):
+        transform_function = self.create_transform(resolution, displacement, rotation)
+        pygame.draw.polygon(display, self.color, list(map(transform_function, self.vertices)))
 
-class Rocket(Thing):
+class Rocket():
+    position = (0., 0.)
+    rotation = 0.
+
+    thruster_angle = math.pi/2
+
+    def __bell_transform(self, vertex):
+        x = vertex[0]
+        y = vertex[1]
+        angle = self.thruster_angle
+        [x, y] = [x*math.cos(angle)-y*math.sin(angle), x*math.sin(angle) + y*math.cos(angle)]
+        [x, y] = [x, y-self.body_height/2]
+        return [x, y]
+
     def __init__(self, width, height):
         hwidth = width/2
         hheight = height/2
-        vertices = [(-hwidth,hheight),(hwidth,hheight),(hwidth,-hheight),(-hwidth,-hheight)]
-        super(Rocket, self).__init__(vertices)
+        self.body_height = height
+        self.body_vertices = [[-hwidth,hheight],[hwidth,hheight],[hwidth,-hheight],[-hwidth,-hheight]]
+        self.bell_vertices = [[-hwidth/2,hwidth],[hwidth/2,hwidth],[hwidth,-hwidth],[-hwidth,-hwidth]]
+        self.body = Polygon(self.body_vertices)
+        self.bell = Polygon(list(map(self.__bell_transform,self.bell_vertices)), (50, 50, 50))
+
+    def draw(self, display, resolution):
+        self.bell.vertices = list(map(self.__bell_transform,self.bell_vertices))
+        self.bell.draw(display, resolution, self.position, self.rotation)
+        self.body.draw(display, resolution, self.position, self.rotation)
+
 
 
 class RocketLander(gym.Env):
 
     BACKGROUND_COLOR = (100, 100, 150)
-    WINDOW_WIDTH = 800
-    WINDOW_HEIGHT = 600
+    WINDOW_WIDTH = 1000
+    WINDOW_HEIGHT = 800
     RESOLUTION = 10 #in pixels per meter
 
     running = True
@@ -64,7 +85,7 @@ class RocketLander(gym.Env):
 
     def __init__(self):
         self.things.append(Rocket(3.7,47.7))
-        self.things[0].position = (200, 200)
+        self.things[0].position = (20, 20)
         self.things[0].rotation = math.pi/4
 
     def run(self):
@@ -77,8 +98,9 @@ class RocketLander(gym.Env):
                         self.running = False
 
             # logic
-            self.things[0].position = (200+100*math.sin(float(pygame.time.get_ticks())/1000), 200)
+            self.things[0].position = (10 + 20+10*math.sin(float(pygame.time.get_ticks())/1000), 30)
             self.things[0].rotation = float(pygame.time.get_ticks())/1000
+            self.things[0].thruster_angle = math.pi/18*math.sin(float(pygame.time.get_ticks())/1000)
             # render
             self.screen.fill(self.BACKGROUND_COLOR)
             #pygame.draw.circle(self.screen, (255, 255, 255), (20, 20), 20)
