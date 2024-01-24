@@ -4,15 +4,15 @@ import pygame
 import math
 
 class Camera:
+
     def __init__(self, position, resolution, scale):
         self.position = position
         self.resolution = resolution
         self.scale = scale
 
 class Polygon:
-    DEFAULT_COLOR = (255, 255, 255)
 
-    def __init__(self, vertices = [[-1,1],[1,1],[1,-1],[-1,-1]], color = DEFAULT_COLOR):
+    def __init__(self, vertices = [[-1,1],[1,1],[1,-1],[-1,-1]], color = (255, 255, 255)):
         self.vertices = vertices
         self.color = color
 
@@ -27,19 +27,21 @@ class Polygon:
     def draw(self, display, camera, displacement, rotation):
         pygame.draw.polygon(display, self.color, [self.transform(camera, displacement, rotation, vertex) for vertex in self.vertices])
 
-class Rocket():
-    #position = (0., 0.)
-    #angle = 0.
-    #mass = 25600
+class Rocket(pymunk.Body):
 
-    width = 3.7
-    height = 47.7
+    # PARAMETERS
+    width = 3.7 #m
+    height = 47.7 #m
+    empty_mass = 25600 #Kg
+    legs_angle = math.pi/4 #Rad
+    thruster_angle = math.pi/18 #Rad
+    thruster_force = 845000 #Newtons
 
-    thruster_vector = 0.
-    thruster_power = 0.
-    thruster_angle = math.pi/18
-    thruster_force = 845000
-    legs_angle = math.pi/4
+    attitude_indicator_size = 10 #Pixels
+
+    # VARIABLES
+    thruster_vector = 0. #[-1 1]
+    thruster_power = 0. #[0 1]
 
     def __bell_transform(self, vertex):
         x = vertex[0]
@@ -64,65 +66,85 @@ class Rocket():
         [x, y] = [x*math.cos(factor*angle)-y*math.sin(factor*angle), x*math.sin(factor*angle) + y*math.cos(factor*angle)]
         [x, y] = [x, y]
         [x, y] = [x-self.width*factor/2, y+self.height/2]
-        return [x,y]
+        return [x, y]
 
+    def __attitude_indicator_transform(self, vertex, scale):
+        x = vertex[0]
+        y = vertex[1]
+        indicator_size = self.attitude_indicator_size
+        [x, y] = [indicator_size*x/scale, indicator_size*y/scale]
+        return [x, y]
 
     def __init__(self, space):
-        # VISUAL REPRESENTATION
+        # VERTICES
         hwidth = self.width/2
         hheight = self.height/2
-        # static elements
         booster_vertices = [[-hwidth,-hheight],[hwidth,-hheight],[hwidth,hheight],[-hwidth,hheight]]
         leg_vertices = [[-hwidth/5, 0],[hwidth/5, 0],[hwidth/10, self.width],[-hwidth/10, self.width]]
+        self.bell_vertices = [[-hwidth/3,-hwidth],[hwidth/3,-hwidth],[self.width/3,hwidth],[-self.width/3,hwidth]]
+        self.exhaust_vertices = [[0,-hwidth/2],[hwidth/2,hwidth],[0,4*hwidth],[-hwidth/2,hwidth]]
+        self.attitude_indicator_vertices = [[0,-1],[1,1],[-1,1]]
+
+        # VISUAL REPRESENTATION
+        #static elements
         self.booster = Polygon(booster_vertices)
         self.leg_l = Polygon([self.__leg_transform(vertex, True) for vertex in leg_vertices], (50, 50, 50))
         self.leg_r = Polygon([self.__leg_transform(vertex, False) for vertex in leg_vertices], (50, 50, 50))
         #dynamic elements
-        self.bell_vertices = [[-hwidth/3,-hwidth],[hwidth/3,-hwidth],[2*hwidth/3,hwidth],[-2*hwidth/3,hwidth]]
-        self.exhaust_vertices = [[0,-hwidth/2],[hwidth/2,hwidth],[0,4*hwidth],[-hwidth/2,hwidth]]
         self.bell = Polygon([self.__bell_transform(vertex) for vertex in self.bell_vertices], (50, 50, 50))
         self.exhaust = Polygon([self.__exhaust_transform(vertex) for vertex in self.exhaust_vertices], (255, 255, 50))
+        self.attitude_indicator = Polygon([self.__attitude_indicator_transform(vertex, 10) for vertex in self.attitude_indicator_vertices], (255, 50, 50))
 
-        # PYSICAL SIMULATION
-        body = pymunk.Body()
-        body.position = 50,0
-        self.body = body
-        body_poly = pymunk.Poly(self.body, self.booster.vertices)
-        body_poly.mass = 25600
-        leg_poly_l = pymunk.Poly(self.body, self.leg_l.vertices)
-        leg_poly_l.mass = 1
-        leg_poly_r = pymunk.Poly(self.body, self.leg_r.vertices)
-        leg_poly_r.mass = 1
+        # PYSICAL REPRESENTATION
+        super().__init__()
+        self.position = [0,-50]
+        body_poly = pymunk.Poly(self, self.booster.vertices)
+        leg_poly_l = pymunk.Poly(self, self.leg_l.vertices)
+        leg_poly_r = pymunk.Poly(self, self.leg_r.vertices)
+        body_poly.mass = self.empty_mass
+        body_poly.friction = 0.6
+        leg_poly_l.friction = 0.6
+        leg_poly_r.friction = 0.6
 
-        space.add(body, body_poly, leg_poly_l, leg_poly_r)
-        #space.add(body, body_poly)+
+        space.add(self, body_poly, leg_poly_l, leg_poly_r)
 
     def thrust(self):
         angle = self.thruster_angle*self.thruster_vector
         [x, y] = [0, -self.thruster_force*self.thruster_power]
         [x, y] = [x*math.cos(angle)-y*math.sin(angle), x*math.sin(angle) + y*math.cos(angle)]
-        self.body.apply_force_at_local_point([x, y], [0, self.height/2])
+        self.apply_force_at_local_point([x, y], [0, self.height/2])
 
     def draw(self, display, camera):
+        self.attitude_indicator.vertices = [self.__attitude_indicator_transform(vertex, camera.scale) for vertex in self.attitude_indicator_vertices]
         self.exhaust.vertices = [self.__exhaust_transform(vertex) for vertex in self.exhaust_vertices]
-        self.exhaust.draw(display, camera, self.body.position, self.body.angle)
         self.bell.vertices = [self.__bell_transform(vertex) for vertex in self.bell_vertices]
-        self.bell.draw(display, camera, self.body.position, self.body.angle)
-        self.leg_l.draw(display, camera, self.body.position, self.body.angle)
-        self.leg_r.draw(display, camera, self.body.position, self.body.angle)
-        self.booster.draw(display, camera, self.body.position, self.body.angle)
 
-class Planet():
+        self.attitude_indicator.draw(display, camera, self.position, self.angle)
+        self.exhaust.draw(display, camera, self.position, self.angle)
+        self.bell.draw(display, camera, self.position, self.angle)
+        self.leg_l.draw(display, camera, self.position, self.angle)
+        self.leg_r.draw(display, camera, self.position, self.angle)
+        self.booster.draw(display, camera, self.position, self.angle)
+
+class Planet(pymunk.Body):
+    width = 400
+    height = 10
+
     def __init__(self, space):
-        self.body = pymunk.Body(1,100,body_type= pymunk.Body.STATIC)
-        self.body.position = 60,60
-        self.terrain_vertices = [(-50,5),(50,5),(50,-5),(-50,-5)]
+        hwidth = self.width/2
+        hheight = self.height/2
+        self.terrain_vertices = [(-hwidth,hheight),(hwidth,hheight),(hwidth,-hheight),(-hwidth,-hheight)]
+        # PYSICAL REPRESENTATION
+        super().__init__(body_type= pymunk.Body.STATIC)
+        self.position = [0,-hheight]
+        planet_poly = pymunk.Poly(self,self.terrain_vertices)
+        planet_poly.friction = 0.6
+        space.add(self, planet_poly)
+        # VISUAL REPRESENTATION
         self.terrain = Polygon(self.terrain_vertices)
-        shape = pymunk.Poly(self.body,self.terrain_vertices)
-        space.add(self.body,shape)
 
     def draw(self, display, camera):
-        self.terrain.draw(display, camera, self.body.position, self.body.angle)
+        self.terrain.draw(display, camera, self.position, self.angle)
 
 class RocketLander(gym.Env):
 
@@ -175,7 +197,7 @@ class RocketLander(gym.Env):
 
     def handle_logic(self):
         dt = self.clock.tick(60)/1000
-        self.camera.position = self.rocket.body.position
+        self.camera.position = self.rocket.position
         self.rocket.thruster_power = float(self.w_down)
         self.rocket.thruster_vector = float(self.a_down) - float(self.d_down)
         self.rocket.thrust()
