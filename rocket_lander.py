@@ -187,7 +187,7 @@ class RocketLander(gym.Env):
     d_down = False
     w_down = False
 
-    def __init__(self):
+    def __init__(self, render_mode = None, ):
         self.camera = Camera([10, 10], self.WINDOW_RESOLUTION, self.RENDER_SCALE)
         self.rocket = Rocket(self.space)
         self.planet = Planet(self.space)
@@ -243,5 +243,6 @@ class RocketLander(gym.Env):
             self.render()
         pygame.quit()
 
-lander = RocketLander()
-lander.run()
+if __name__ == "__main__":
+    lander = RocketLander()
+    lander.run()
