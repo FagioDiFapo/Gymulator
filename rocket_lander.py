@@ -139,26 +139,33 @@ class Rocket(pymunk.Body):
 class Planet(pymunk.Body):
     pad_width = 86 #m
     pad_height = 10 #m
+    terrain_width = 100000 #m
+    terrain_height = 100000 #m
     diameter = 12742000 #m
 
     def __init__(self, space):
         hwidth = self.pad_width/2
         hheight = self.pad_height/2
-        self.pad_vertices = [(-hwidth,hheight),(hwidth,hheight),(hwidth,-hheight),(-hwidth,-hheight)]
+        htwidth = self.terrain_width/2
+        pad_vertices = [(-hwidth,hheight),(hwidth,hheight),(hwidth,-hheight),(-hwidth,-hheight)]
+        terrain_vertices = [(-htwidth,hheight),(htwidth,hheight),(htwidth,self.terrain_height+hheight),(-htwidth,self.terrain_height+hheight)]
         # PYSICAL REPRESENTATION
         super().__init__(body_type= pymunk.Body.STATIC)
         self.position = [0,-hheight]
-        pad_poly = pymunk.Poly(self,self.pad_vertices)
-        #terrain_poly = pymunk.Circle(self, self.diameter/2)
+        pad_poly = pymunk.Poly(self,pad_vertices)
+        terrain_poly = pymunk.Poly(self, terrain_vertices)
         pad_poly.friction = 0.6
-        space.add(self, pad_poly)
+        terrain_poly.friction = 0.6
+        space.add(self, pad_poly, terrain_poly)
         # VISUAL REPRESENTATION
-        self.pad = Shape(self.pad_vertices)
-        self.terrain = Circle(self.diameter/2, color = (100, 150, 255), line_color = (255, 0, 0))
+        self.pad = Shape(pad_vertices)
+        self.terrain = Shape(terrain_vertices, (25, 25, 25))
+        #self.terrain = Circle(self.diameter/2, color = (100, 150, 255), line_color = (255, 0, 0))
 
     def draw(self, display, camera):
         self.pad.draw(display, camera, self.position, self.angle)
-        self.terrain.draw(display, camera, [self.position[0], self.position[1]+self.diameter/2], self.angle)
+        self.terrain.draw(display, camera, self.position, self.angle)
+        #self.terrain.draw(display, camera, [self.position[0], self.position[1]+self.pad_height/2], self.angle)
 
 class RocketLander(gym.Env):
 
@@ -218,6 +225,13 @@ class RocketLander(gym.Env):
 
         self.space.step(dt)
 
+    def render(self):
+        self.screen.fill(self.BACKGROUND_COLOR)
+        self.rocket.draw(self.screen, self.camera)
+        self.planet.draw(self.screen, self.camera)
+        pygame.display.update()
+
+
     def run(self):
         pygame.init()
         while self.running:
@@ -225,14 +239,8 @@ class RocketLander(gym.Env):
             self.handle_events()
             # logic
             self.handle_logic()
-            #self.things[0].thruster_angle = math.pi/18*math.sin(float(pygame.time.get_ticks())/1000)
-            #self.things[0].thruster_power = 0.5+0.5*math.sin(float(pygame.time.get_ticks())/1000)
             # render
-            self.screen.fill(self.BACKGROUND_COLOR)
-            #pygame.draw.circle(self.screen, (255, 255, 255), (20, 20), 20)
-            self.rocket.draw(self.screen, self.camera)
-            self.planet.draw(self.screen, self.camera)
-            pygame.display.update()
+            self.render()
         pygame.quit()
 
 lander = RocketLander()
