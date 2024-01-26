@@ -10,13 +10,12 @@ class Camera:
         self.resolution = resolution
         self.scale = scale
 
-class Polygon:
-
+class Shape:
     def __init__(self, vertices = [[-1,1],[1,1],[1,-1],[-1,-1]], color = (255, 255, 255)):
         self.vertices = vertices
         self.color = color
 
-    def transform(self, camera, displacement, rotation, vertex):
+    def __transform(self, camera, displacement, rotation, vertex):
         x = vertex[0]
         y = vertex[1]
         [x, y] = [x*math.cos(rotation)-y*math.sin(rotation), x*math.sin(rotation)+y*math.cos(rotation)]
@@ -25,7 +24,18 @@ class Polygon:
         return [x, y]
 
     def draw(self, display, camera, displacement, rotation):
-        pygame.draw.polygon(display, self.color, [self.transform(camera, displacement, rotation, vertex) for vertex in self.vertices])
+        pygame.draw.polygon(display, self.color, [self.__transform(camera, displacement, rotation, vertex) for vertex in self.vertices])
+
+class Circle(Shape):
+    def __init__(self, radius = 1, color = (255, 255, 255), line_color = (255, 0, 0)):
+            self.radius = radius
+            self.color = color
+            self.line_color = line_color
+
+    def draw(self, display, camera, displacement, rotation):
+        pygame.draw.circle(display, self.color, self._Shape__transform(camera, displacement, rotation, [0, 0]), self.radius*camera.scale)
+        pygame.draw.line(display, self.line_color, self._Shape__transform(camera, displacement, rotation, [0, 0]), self._Shape__transform(camera, displacement, rotation, [0, -self.radius]), width = 3)
+
 
 class Rocket(pymunk.Body):
 
@@ -87,13 +97,13 @@ class Rocket(pymunk.Body):
 
         # VISUAL REPRESENTATION
         #static elements
-        self.booster = Polygon(booster_vertices)
-        self.leg_l = Polygon([self.__leg_transform(vertex, True) for vertex in leg_vertices], (50, 50, 50))
-        self.leg_r = Polygon([self.__leg_transform(vertex, False) for vertex in leg_vertices], (50, 50, 50))
+        self.booster = Shape(booster_vertices)
+        self.leg_l = Shape([self.__leg_transform(vertex, True) for vertex in leg_vertices], (50, 50, 50))
+        self.leg_r = Shape([self.__leg_transform(vertex, False) for vertex in leg_vertices], (50, 50, 50))
         #dynamic elements
-        self.bell = Polygon([self.__bell_transform(vertex) for vertex in self.bell_vertices], (50, 50, 50))
-        self.exhaust = Polygon([self.__exhaust_transform(vertex) for vertex in self.exhaust_vertices], (255, 255, 50))
-        self.attitude_indicator = Polygon([self.__attitude_indicator_transform(vertex, 10) for vertex in self.attitude_indicator_vertices], (255, 50, 50))
+        self.bell = Shape([self.__bell_transform(vertex) for vertex in self.bell_vertices], (50, 50, 50))
+        self.exhaust = Shape([self.__exhaust_transform(vertex) for vertex in self.exhaust_vertices], (255, 255, 50))
+        self.attitude_indicator = Shape([self.__attitude_indicator_transform(vertex, 10) for vertex in self.attitude_indicator_vertices], (255, 50, 50))
 
         # PYSICAL REPRESENTATION
         super().__init__()
@@ -127,24 +137,28 @@ class Rocket(pymunk.Body):
         self.booster.draw(display, camera, self.position, self.angle)
 
 class Planet(pymunk.Body):
-    width = 400
-    height = 10
+    pad_width = 86 #m
+    pad_height = 10 #m
+    diameter = 12742000 #m
 
     def __init__(self, space):
-        hwidth = self.width/2
-        hheight = self.height/2
-        self.terrain_vertices = [(-hwidth,hheight),(hwidth,hheight),(hwidth,-hheight),(-hwidth,-hheight)]
+        hwidth = self.pad_width/2
+        hheight = self.pad_height/2
+        self.pad_vertices = [(-hwidth,hheight),(hwidth,hheight),(hwidth,-hheight),(-hwidth,-hheight)]
         # PYSICAL REPRESENTATION
         super().__init__(body_type= pymunk.Body.STATIC)
         self.position = [0,-hheight]
-        planet_poly = pymunk.Poly(self,self.terrain_vertices)
-        planet_poly.friction = 0.6
-        space.add(self, planet_poly)
+        pad_poly = pymunk.Poly(self,self.pad_vertices)
+        #terrain_poly = pymunk.Circle(self, self.diameter/2)
+        pad_poly.friction = 0.6
+        space.add(self, pad_poly)
         # VISUAL REPRESENTATION
-        self.terrain = Polygon(self.terrain_vertices)
+        self.pad = Shape(self.pad_vertices)
+        self.terrain = Circle(self.diameter/2, color = (100, 150, 255), line_color = (255, 0, 0))
 
     def draw(self, display, camera):
-        self.terrain.draw(display, camera, self.position, self.angle)
+        self.pad.draw(display, camera, self.position, self.angle)
+        self.terrain.draw(display, camera, [self.position[0], self.position[1]+self.diameter/2], self.angle)
 
 class RocketLander(gym.Env):
 
