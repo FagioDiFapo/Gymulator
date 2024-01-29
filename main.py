@@ -20,14 +20,14 @@ from rocket_lander import RocketLander
 #    verbose=1,
 #    device="cuda")
 #
-#model.learn(total_timesteps=3000000)
-#model_name = "ppo-RocketLander3"
+#model.learn(total_timesteps=1000000)
+#model_name = "ppo-RocketLander1"
 #model.save(model_name)
 
 # EVALUATION RUN
 eval_env = Monitor(RocketLander(render_mode = "human"))
 #eval_env = LunarLander(render_mode = "human")
-model = PPO.load("ppo-RocketLander3.zip")
+model = PPO.load("ppo-RocketLander1.zip")
 mean_reward, std_reward = evaluate_policy(model, eval_env, n_eval_episodes=10, deterministic=True)
 print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
 

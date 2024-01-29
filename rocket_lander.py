@@ -15,13 +15,14 @@ class Camera:
         self.scale = scale
 
 class Shape:
+
     def __init__(self, vertices = [[-1,1],[1,1],[1,-1],[-1,-1]], color = (255, 255, 255)):
         self.vertices = vertices
         self.color = color
 
+
     def __transform(self, camera, displacement, rotation, vertex):
-        x = vertex[0]
-        y = vertex[1]
+        [x, y] = vertex
         [x, y] = [x*math.cos(rotation)-y*math.sin(rotation), x*math.sin(rotation)+y*math.cos(rotation)]
         [x, y] = [x+displacement[0], y+displacement[1]]
         [x, y] = [camera.scale*(x-camera.position[0])+camera.resolution[0]/2, camera.scale*(y-camera.position[1])+camera.resolution[1]/2]
@@ -30,40 +31,43 @@ class Shape:
     def draw(self, display, camera, displacement, rotation):
         pygame.draw.polygon(display, self.color, [self.__transform(camera, displacement, rotation, vertex) for vertex in self.vertices])
 
+
 class Circle(Shape):
+
+    DEBUG_LINE_WIDTH = 3 #pixels
+
     def __init__(self, radius = 1, color = (255, 255, 255), line_color = (255, 0, 0)):
-            self.radius = radius
-            self.color = color
-            self.line_color = line_color
+        self.radius = radius
+        self.color = color
+        self.line_color = line_color
 
     def draw(self, display, camera, displacement, rotation):
         pygame.draw.circle(display, self.color, self._Shape__transform(camera, displacement, rotation, [0, 0]), self.radius*camera.scale)
-        pygame.draw.line(display, self.line_color, self._Shape__transform(camera, displacement, rotation, [0, 0]), self._Shape__transform(camera, displacement, rotation, [0, -self.radius]), width = 3)
+        pygame.draw.line(display, self.line_color,
+                self._Shape__transform(camera, displacement, rotation, [0, 0]), self._Shape__transform(camera, displacement, rotation,[0, -self.radius]),
+                width = self.DEBUG_LINE_WIDTH)
 
 
 class Rocket(pymunk.Body):
 
     # PARAMETERS
-    width = 3.7 #m
-    height = 47.7 #m
-    empty_mass = 25600 #Kg
-    legs_angle = math.pi/4 #Rad
-    thruster_angle = math.pi/18 #Rad
-    thruster_force = 845000 #Newtons
+    # physycal attributes
+    WIDTH = 3.7 #m
+    HEIGHT = 47.7 #m
+    EMPTY_MASS = 25600 #Kg
+    LEGS_ANGLE = math.pi/4 #Rad
+    MAX_THRUSTER_ANGLE = math.pi/18 #Rad
+    MAX_THRUSTER_FORCE = 845000 #Newtons
 
-    attitude_indicator_size = 10 #Pixels
-
-    # VARIABLES
-    thruster_vector = 0. #[-1 1]
-    thruster_power = 0. #[0 1]
-    collisions = [False, False, False]
+    # visual attributes
+    ATTITUDE_INDICATOR_SCALE = 10 #Pixels
 
     def __bell_transform(self, vertex):
         x = vertex[0]
         y = vertex[1]
-        angle = self.thruster_angle*self.thruster_vector
+        angle = self.MAX_THRUSTER_ANGLE*self.thruster_vector
         [x, y] = [x*math.cos(angle)-y*math.sin(angle), x*math.sin(angle) + y*math.cos(angle)]
-        [x, y] = [x, y+self.height/2]
+        [x, y] = [x, y+self.HEIGHT/2]
         return [x, y]
 
     def __exhaust_transform(self, vertex):
@@ -77,16 +81,16 @@ class Rocket(pymunk.Body):
         factor = 1 if left else -1
         x = vertex[0]
         y = vertex[1]
-        angle = self.legs_angle
+        angle = self.LEGS_ANGLE
         [x, y] = [x*math.cos(factor*angle)-y*math.sin(factor*angle), x*math.sin(factor*angle) + y*math.cos(factor*angle)]
         [x, y] = [x, y]
-        [x, y] = [x-self.width*factor/2, y+self.height/2]
+        [x, y] = [x-self.WIDTH*factor/2, y+self.HEIGHT/2]
         return [x, y]
 
     def __attitude_indicator_transform(self, vertex, scale):
         x = vertex[0]
         y = vertex[1]
-        indicator_size = self.attitude_indicator_size
+        indicator_size = self.ATTITUDE_INDICATOR_SCALE
         [x, y] = [indicator_size*x/scale, indicator_size*y/scale]
         return [x, y]
 
@@ -102,21 +106,26 @@ class Rocket(pymunk.Body):
         self.collisions = [collisions[body] for body in bodies_to_check]
 
     def __init__(self, space):
+        # RUNTIME VARIABLES
+        self.thruster_vector = 0. #[-1 1]
+        self.thruster_power = 0. #[0 1]
+        self.collisions = [False, False, False]
+
         # VERTICES
-        hwidth = self.width/2
-        hheight = self.height/2
+        hwidth = self.WIDTH/2
+        hheight = self.HEIGHT/2
         booster_vertices = [[-hwidth,-hheight],[hwidth,-hheight],[hwidth,hheight],[-hwidth,hheight]]
-        leg_vertices = [[-hwidth/5, 0],[hwidth/5, 0],[hwidth/10, self.width],[-hwidth/10, self.width]]
-        self.bell_vertices = [[-hwidth/3,-hwidth],[hwidth/3,-hwidth],[self.width/3,hwidth],[-self.width/3,hwidth]]
+        leg_vertices = [[-hwidth/5, 0],[hwidth/5, 0],[hwidth/10, self.WIDTH],[-hwidth/10, self.WIDTH]]
+        self.bell_vertices = [[-hwidth/3,-hwidth],[hwidth/3,-hwidth],[self.WIDTH/3,hwidth],[-self.WIDTH/3,hwidth]]
         self.exhaust_vertices = [[0,-hwidth/2],[hwidth/2,hwidth],[0,4*hwidth],[-hwidth/2,hwidth]]
         self.attitude_indicator_vertices = [[0,-1],[1,1],[-1,1]]
 
         # VISUAL REPRESENTATION
-        #static elements
+        # static elements
         self.booster = Shape(booster_vertices)
         self.leg_l = Shape([self.__leg_transform(vertex, True) for vertex in leg_vertices], (50, 50, 50))
         self.leg_r = Shape([self.__leg_transform(vertex, False) for vertex in leg_vertices], (50, 50, 50))
-        #dynamic elements
+        # dynamic elements
         self.bell = Shape([self.__bell_transform(vertex) for vertex in self.bell_vertices], (50, 50, 50))
         self.exhaust = Shape([self.__exhaust_transform(vertex) for vertex in self.exhaust_vertices], (255, 255, 50))
         self.attitude_indicator = Shape([self.__attitude_indicator_transform(vertex, 10) for vertex in self.attitude_indicator_vertices], (255, 50, 50))
@@ -127,7 +136,7 @@ class Rocket(pymunk.Body):
         self.body_poly = pymunk.Poly(self, self.booster.vertices)
         self.leg_poly_l = pymunk.Poly(self, self.leg_l.vertices)
         self.leg_poly_r = pymunk.Poly(self, self.leg_r.vertices)
-        self.body_poly.mass = self.empty_mass
+        self.body_poly.mass = self.EMPTY_MASS
         self.body_poly.friction = 0.6
         self.leg_poly_l.friction = 0.6
         self.leg_poly_r.friction = 0.6
@@ -135,10 +144,10 @@ class Rocket(pymunk.Body):
         space.add(self, self.body_poly, self.leg_poly_l, self.leg_poly_r)
 
     def thrust(self):
-        angle = self.thruster_angle*self.thruster_vector
-        [x, y] = [0, -self.thruster_force*self.thruster_power]
+        angle = self.MAX_THRUSTER_ANGLE*self.thruster_vector
+        [x, y] = [0, -self.MAX_THRUSTER_FORCE*self.thruster_power]
         [x, y] = [x*math.cos(angle)-y*math.sin(angle), x*math.sin(angle) + y*math.cos(angle)]
-        self.apply_force_at_local_point([x, y], [0, self.height/2])
+        self.apply_force_at_local_point([x, y], [0, self.HEIGHT/2])
 
     def draw(self, display, camera):
         self.attitude_indicator.vertices = [self.__attitude_indicator_transform(vertex, camera.scale) for vertex in self.attitude_indicator_vertices]
@@ -153,18 +162,21 @@ class Rocket(pymunk.Body):
         self.booster.draw(display, camera, self.position, self.angle)
 
 class Planet(pymunk.Body):
-    pad_width = 86 #m
-    pad_height = 10 #m
-    terrain_width = 100000 #m
-    terrain_height = 100000 #m
-    diameter = 12742000 #m
+    PAD_WIDTH = 86 #m
+    PAD_HEIGHT = 10 #m
+    TERRAIN_WIDTH = 100000 #m
+    TERRAIN_HEIGHT = 100000 #m
+    #DIAMETER = 12742000 #m
 
     def __init__(self, space):
-        hwidth = self.pad_width/2
-        hheight = self.pad_height/2
-        htwidth = self.terrain_width/2
-        pad_vertices = [(-hwidth,hheight),(hwidth,hheight),(hwidth,-hheight),(-hwidth,-hheight)]
-        terrain_vertices = [(-htwidth,hheight),(htwidth,hheight),(htwidth,self.terrain_height+hheight),(-htwidth,self.terrain_height+hheight)]
+        hwidth = self.PAD_WIDTH/2
+        hheight = self.PAD_HEIGHT/2
+        htwidth = self.TERRAIN_WIDTH/2
+
+        # VERTICES
+        pad_vertices = [[-hwidth,hheight],[hwidth,hheight],[hwidth,-hheight],[-hwidth,-hheight]]
+        terrain_vertices = [[-htwidth,hheight],[htwidth,hheight],[htwidth,self.TERRAIN_HEIGHT+hheight],[-htwidth,self.TERRAIN_HEIGHT+hheight]]
+
         # PYSICAL REPRESENTATION
         super().__init__(body_type= pymunk.Body.STATIC)
         self.position = [0,-hheight]
@@ -173,27 +185,24 @@ class Planet(pymunk.Body):
         pad_poly.friction = 0.6
         terrain_poly.friction = 0.6
         space.add(self, pad_poly, terrain_poly)
+
         # VISUAL REPRESENTATION
         self.pad = Shape(pad_vertices)
         self.terrain = Shape(terrain_vertices, (25, 25, 25))
-        #self.terrain = Circle(self.diameter/2, color = (100, 150, 255), line_color = (255, 0, 0))
+        #self.terrain = Circle(self.DIAMETER/2, color = (100, 150, 255), line_color = (255, 0, 0))
 
     def draw(self, display, camera):
         self.pad.draw(display, camera, self.position, self.angle)
         self.terrain.draw(display, camera, self.position, self.angle)
-        #self.terrain.draw(display, camera, [self.position[0], self.position[1]+self.pad_height/2], self.angle)
+        #self.terrain.draw(display, camera, [self.position[0], self.position[1]+self.PAD_HEIGHT/2], self.angle)
 
 class RocketLander(gym.Env):
 
-    # RENDERING
+    # PARAMETERS
+    # VISUAL ATTRIBUTES
     BACKGROUND_COLOR = (100, 100, 150)
-    WINDOW_RESOLUTION = [1000, 800]
+    WINDOW_RESOLUTION = [1000, 700]
     RENDER_SCALE = 2 #in pixels per meter
-
-    running = True
-    elapsed_time = 0
-    screen = pygame.display.set_mode(WINDOW_RESOLUTION)
-    clock = pygame.time.Clock()
 
     # USER INPUTS
     in_left = False
@@ -262,8 +271,10 @@ class RocketLander(gym.Env):
 
         return reward
 
-    def __init_elements(self, seed):
+    def __init_landing_scenario(self, seed):
         rand.seed(seed)
+        # SIMULATION ELEMENTS
+        self.elapsed_time = 0
         self.prev_shaping = None
         self.space = pymunk.Space()
         self.space.gravity = [0,9.81]
@@ -271,18 +282,21 @@ class RocketLander(gym.Env):
         self.rocket = Rocket(self.space)
         self.planet = Planet(self.space)
         self.rocket.position = [rand.uniform(-100., 100.), rand.uniform(-600., -400.)]
-
-    def __init__(self, render_mode = None, seed = rand.random()):
-        self.render_mode = render_mode
-        # SIMULATION ELEMENTS
-        self.__init_elements(seed)
         # GYM ELEMENTS
         self.action_space, self.observation_space = self.__get_spaces()
+
+    def __init__(self, render_mode = None, seed = rand.random()):
+        self.running = True
+        self.screen = pygame.display.set_mode(self.WINDOW_RESOLUTION)
+        self.clock = pygame.time.Clock()
+
+        self.render_mode = render_mode
+        self.__init_landing_scenario(seed)
 
     # GYM FUNCTIONS
     def reset(self, *, seed = None, options = None):
         super().reset(seed=seed)
-        self.__init_elements(seed)
+        self.__init_landing_scenario(seed)
         self.elapsed_time = 0
         return self.step(0)[0], {}
 
