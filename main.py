@@ -20,7 +20,7 @@ from rocket_lander import RocketLander
 #    verbose=1,
 #    device="cuda")
 #
-#model.learn(total_timesteps=1000000)
+#model.learn(total_timesteps=3000000)
 #model_name = "ppo-RocketLander3"
 #model.save(model_name)
 

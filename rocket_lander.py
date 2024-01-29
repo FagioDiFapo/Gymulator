@@ -318,9 +318,9 @@ class RocketLander(gym.Env):
         terminated = False
         if (
             self.rocket.collisions[0] or
-            #((self.rocket.collisions[1] or self.rocket.collisions[2]) and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) > 2/300) or
+            ((self.rocket.collisions[1] or self.rocket.collisions[2]) and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) > 2/300) or
             abs(observations[0]) > 1000 or abs(observations[1]) >= 1000 or
-            self.elapsed_time > 60
+            self.elapsed_time > 60 - np.sqrt(observations[2]*observations[2] + observations[3]*observations[3])
         ):
             terminated = True
             reward = -100
