@@ -18,12 +18,17 @@ class Trainer:
 
     def __init__(self, model_name):
         self.model_name = model_name
+
+    def train(self, timesteps, nenvs):
+        envs = make_vec_env(RocketLander, n_envs=nenvs)
         if os.path.isfile(self.model_name+".zip"):
             self.model = PPO.load(self.model_name+".zip")
             self.model_name += "v2"
+            self.model.set_env(envs)
         else:
             self.model = PPO(
             policy = 'MlpPolicy',
+            env = envs,
             n_steps = 1024,
             batch_size = 64,
             n_epochs = 4,
@@ -33,16 +38,12 @@ class Trainer:
             verbose=1,
             device="cuda")
 
-    def train(self, timesteps, nenvs):
-        envs = make_vec_env(RocketLander, n_envs=nenvs)
-        self.model.set_env(envs)
-
         self.model.learn(total_timesteps=timesteps)
         self.model.save(self.model_name)
 
     def test(self):
         eval_env = Monitor(RocketLander(render_mode = "human"))
-        self.model.set_env(eval_env)
+        self.model = PPO.load(self.model_name+".zip")
 
         mean_reward, std_reward = evaluate_policy(self.model, eval_env, n_eval_episodes=10, deterministic=True)
         print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
