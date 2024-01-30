@@ -195,6 +195,7 @@ class Planet(pymunk.Body):
 class RocketLander(gym.Env):
 
     # PARAMETERS
+    LANDER_INSTANCES = []
     # VISUAL ATTRIBUTES
     BACKGROUND_COLOR = (100, 100, 150)
     WINDOW_RESOLUTION = [1000, 700]
@@ -288,6 +289,7 @@ class RocketLander(gym.Env):
 
         self.render_mode = render_mode
         self.__init_landing_scenario(seed)
+        self.LANDER_INSTANCES.append(self)
 
     # GYM FUNCTIONS
     def reset(self, *, seed = None, options = None):
@@ -324,7 +326,6 @@ class RocketLander(gym.Env):
         self.handle_events(False)
         if self.render_mode == "human":
             self.render()
-        #self.render()
 
         terminated = False
         if (
@@ -369,7 +370,6 @@ class RocketLander(gym.Env):
                                 self.in_up = False
 
     def handle_logic(self, dt):
-        self.camera.position = self.rocket.position
         self.rocket.thruster_power = float(self.in_up)
         self.rocket.thruster_vector = float(self.in_left) - float(self.in_right)
         self.rocket.thrust()
@@ -381,9 +381,12 @@ class RocketLander(gym.Env):
         self.space.step(dt)
 
     def render(self):
+        if self != self.LANDER_INSTANCES[0]:
+            return
         self.screen.fill(self.BACKGROUND_COLOR)
-        self.rocket.draw(self.screen, self.camera)
         self.planet.draw(self.screen, self.camera)
+        for instance in self.LANDER_INSTANCES:
+            instance.rocket.draw(self.screen, self.camera)
         pygame.display.update()
 
     def run(self):
@@ -395,6 +398,7 @@ class RocketLander(gym.Env):
             dt = self.clock.tick(60)/1000
             self.handle_logic(dt)
             # render
+            self.camera.position = self.rocket.position
             self.render()
         pygame.quit()
 

@@ -1,9 +1,17 @@
+import gymnasium as gym
+from stable_baselines3 import PPO
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.monitor import Monitor
+from rocket_lander import RocketLander
 import argparse
 
 def get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", help="Execution mode between train or test", required=True, type=string, choices=["train","test"])
-    parser.add_argument("model_name", help="Name of the model you want to train/test", default="ppo-RocketLander", type=string)
+    parser.add_argument("mode", help="Execution mode between train or test", type=str, choices=["train","test"])
+    parser.add_argument("-model_name", help="Name of the model you want to train/test", default="ppo-RocketLander", type=str)
+
+    return parser.parse_args()
 
 class Trainer:
 
@@ -30,9 +38,9 @@ class Trainer:
 
     def test(self):
         eval_env = Monitor(RocketLander(render_mode = "human"))
-        if self.MODEL = None: self.MODEL = PPO.load(self.model_name+".zip")
+        if self.MODEL == None: self.MODEL = PPO.load(self.model_name+".zip")
 
-        mean_reward, std_reward = evaluate_policy(model, eval_env, n_eval_episodes=10, deterministic=True)
+        mean_reward, std_reward = evaluate_policy(self.MODEL, eval_env, n_eval_episodes=10, deterministic=True)
         print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
 
 
