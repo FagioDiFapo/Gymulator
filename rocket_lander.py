@@ -255,11 +255,11 @@ class RocketLander(gym.Env):
     def __get_reward(self, obs):
         reward = 0
         shaping = (
-            - 200 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
+            - 500 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
             - 100 * np.sqrt(obs[2] * obs[2] + obs[3] * obs[3])
-            - 100 * abs(obs[4])
-            + 10 * obs[6]
-            + 10 * obs[7]
+            #- 100 * abs(obs[4])
+            + 30 * obs[6]
+            + 30 * obs[7]
         )
         if self.prev_shaping is not None:
             reward = shaping - self.prev_shaping
@@ -324,15 +324,14 @@ class RocketLander(gym.Env):
         reward = self.__get_reward(observations)
 
         self.handle_events(False)
-        if self.render_mode == "human":
-            self.render()
+        #if self.render_mode == "human":
+        self.render()
 
         terminated = False
         if (
             self.rocket.collisions[0] or
             ((self.rocket.collisions[1] or self.rocket.collisions[2]) and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) > 2/100) or
-            abs(observations[0]) > 500 or abs(observations[1]) >= 500 or
-            self.elapsed_time > 60
+            abs(observations[0]) > 1 or abs(observations[1]) >= 1
         ):
             terminated = True
             reward = -100
