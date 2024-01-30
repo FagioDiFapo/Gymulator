@@ -63,27 +63,23 @@ class Rocket(pymunk.Body):
     ATTITUDE_INDICATOR_SCALE = 10 #Pixels
 
     def __bell_transform(self, vertex):
-        x = vertex[0]
-        y = vertex[1]
         angle = self.MAX_THRUSTER_ANGLE*self.thruster_vector
+        [x, y] = vertex
         [x, y] = [x*math.cos(angle)-y*math.sin(angle), x*math.sin(angle) + y*math.cos(angle)]
         [x, y] = [x, y+self.HEIGHT/2]
         return [x, y]
 
     def __exhaust_transform(self, vertex):
-        x = vertex[0]
-        y = vertex[1]
+        [x, y] = vertex
         [x, y] = [self.thruster_power*x, self.thruster_power*y]
         [x, y] = self.__bell_transform([x, y])
         return [x, y]
 
     def __leg_transform(self, vertex, left):
         factor = 1 if left else -1
-        x = vertex[0]
-        y = vertex[1]
         angle = self.LEGS_ANGLE
+        [x, y] = vertex
         [x, y] = [x*math.cos(factor*angle)-y*math.sin(factor*angle), x*math.sin(factor*angle) + y*math.cos(factor*angle)]
-        [x, y] = [x, y]
         [x, y] = [x-self.WIDTH*factor/2, y+self.HEIGHT/2]
         return [x, y]
 
@@ -114,18 +110,18 @@ class Rocket(pymunk.Body):
         # VERTICES
         hwidth = self.WIDTH/2
         hheight = self.HEIGHT/2
+        # static elements
         booster_vertices = [[-hwidth,-hheight],[hwidth,-hheight],[hwidth,hheight],[-hwidth,hheight]]
         leg_vertices = [[-hwidth/5, 0],[hwidth/5, 0],[hwidth/10, self.WIDTH],[-hwidth/10, self.WIDTH]]
+        # dynamic elements
         self.bell_vertices = [[-hwidth/3,-hwidth],[hwidth/3,-hwidth],[self.WIDTH/3,hwidth],[-self.WIDTH/3,hwidth]]
         self.exhaust_vertices = [[0,-hwidth/2],[hwidth/2,hwidth],[0,4*hwidth],[-hwidth/2,hwidth]]
         self.attitude_indicator_vertices = [[0,-1],[1,1],[-1,1]]
 
         # VISUAL REPRESENTATION
-        # static elements
         self.booster = Shape(booster_vertices)
         self.leg_l = Shape([self.__leg_transform(vertex, True) for vertex in leg_vertices], (50, 50, 50))
         self.leg_r = Shape([self.__leg_transform(vertex, False) for vertex in leg_vertices], (50, 50, 50))
-        # dynamic elements
         self.bell = Shape([self.__bell_transform(vertex) for vertex in self.bell_vertices], (50, 50, 50))
         self.exhaust = Shape([self.__exhaust_transform(vertex) for vertex in self.exhaust_vertices], (255, 255, 50))
         self.attitude_indicator = Shape([self.__attitude_indicator_transform(vertex, 10) for vertex in self.attitude_indicator_vertices], (255, 50, 50))
@@ -203,6 +199,7 @@ class RocketLander(gym.Env):
     BACKGROUND_COLOR = (100, 100, 150)
     WINDOW_RESOLUTION = [1000, 700]
     RENDER_SCALE = 2 #in pixels per meter
+    camera = Camera([10, 10], WINDOW_RESOLUTION, RENDER_SCALE)
 
     # USER INPUTS
     in_left = False
@@ -245,7 +242,7 @@ class RocketLander(gym.Env):
         r_pos = self.rocket.position
         r_vel = self.rocket.velocity
         observations = [
-            r_pos[0]/1000, r_pos[1]/1000,
+            r_pos[0]/500, r_pos[1]/500,
             r_vel[0]/100, r_vel[1]/100,
             self.rocket.angle,
             self.rocket.angular_velocity,
@@ -257,9 +254,9 @@ class RocketLander(gym.Env):
     def __get_reward(self, obs):
         reward = 0
         shaping = (
-            - 150 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
+            - 100 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
             - 100 * np.sqrt(obs[2] * obs[2] + obs[3] * obs[3])
-            - 50 * abs(obs[4])
+            - 100 * abs(obs[4])
             + 10 * obs[6]
             + 10 * obs[7]
         )
@@ -267,7 +264,7 @@ class RocketLander(gym.Env):
             reward = shaping - self.prev_shaping
         self.prev_shaping = shaping
 
-        reward -= self.rocket.thruster_power * 0.30
+        reward -= self.rocket.thruster_power * 0.05
 
         return reward
 
@@ -278,10 +275,9 @@ class RocketLander(gym.Env):
         self.prev_shaping = None
         self.space = pymunk.Space()
         self.space.gravity = [0,9.81]
-        self.camera = Camera([10, 10], self.WINDOW_RESOLUTION, self.RENDER_SCALE)
         self.rocket = Rocket(self.space)
         self.planet = Planet(self.space)
-        self.rocket.position = [rand.uniform(-100., 100.), rand.uniform(-600., -400.)]
+        self.rocket.position = [rand.uniform(-100., 100.), rand.uniform(-200., -100.)]
         # GYM ELEMENTS
         self.action_space, self.observation_space = self.__get_spaces()
 
@@ -328,17 +324,18 @@ class RocketLander(gym.Env):
         self.handle_events(False)
         if self.render_mode == "human":
             self.render()
+        #self.render()
 
         terminated = False
         if (
             self.rocket.collisions[0] or
-            ((self.rocket.collisions[1] or self.rocket.collisions[2]) and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) > 2/300) or
-            abs(observations[0]) > 1000 or abs(observations[1]) >= 1000 or
-            self.elapsed_time > 60 - np.sqrt(observations[2]*observations[2] + observations[3]*observations[3])
+            ((self.rocket.collisions[1] or self.rocket.collisions[2]) and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) > 2/100) or
+            abs(observations[0]) > 500 or abs(observations[1]) >= 500 or
+            self.elapsed_time > 60
         ):
             terminated = True
             reward = -100
-        if self.rocket.collisions[1] and self.rocket.collisions[2] and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) < 2/300:
+        if self.rocket.collisions[1] and self.rocket.collisions[2] and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) < 2/100:
             terminated = True
             reward = +100
 
