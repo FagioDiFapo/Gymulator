@@ -254,7 +254,7 @@ class RocketLander(gym.Env):
     def __get_reward(self, obs):
         reward = 0
         shaping = (
-            - 100 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
+            - 200 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
             - 100 * np.sqrt(obs[2] * obs[2] + obs[3] * obs[3])
             - 100 * abs(obs[4])
             + 10 * obs[6]
@@ -264,7 +264,7 @@ class RocketLander(gym.Env):
             reward = shaping - self.prev_shaping
         self.prev_shaping = shaping
 
-        reward -= self.rocket.thruster_power * 0.05
+        #reward -= self.rocket.thruster_power * 0.05
 
         return reward
 
@@ -375,8 +375,8 @@ class RocketLander(gym.Env):
         self.rocket.thrust()
         self.rocket.update_collisions()
         #observations = self.__get_observations()
-        #print(observations)
-        #print(self.__get_reward(observations))
+        ##print(observations)
+        #print("{0:0.2f}".format(self.__get_reward(observations)))
 
         self.space.step(dt)
 
