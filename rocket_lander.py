@@ -405,9 +405,9 @@ class RocketLander(gym.Env):
             # logic
             dt = self.clock.tick(60)/1000
             self.handle_logic(dt)
-            observations = self.__get_observations()
+            #observations = self.__get_observations()
             #print(observations)
-            print("{0:0.2f}".format(self.__get_reward(observations)))
+            #print("{0:0.2f}".format(self.__get_reward(observations)))
             # render
             self.camera.position = self.rocket.position
             self.render()
