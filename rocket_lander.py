@@ -176,16 +176,27 @@ class Planet(pymunk.Body):
         # PYSICAL REPRESENTATION
         super().__init__(body_type= pymunk.Body.STATIC)
         self.position = [0,-hheight]
-        pad_poly = pymunk.Poly(self,pad_vertices)
+        self.pad_poly = pymunk.Poly(self,pad_vertices)
         terrain_poly = pymunk.Poly(self, terrain_vertices)
-        pad_poly.friction = 0.6
+        self.pad_poly.friction = 0.6
         terrain_poly.friction = 0.6
-        space.add(self, pad_poly, terrain_poly)
+        space.add(self, self.pad_poly, terrain_poly)
 
         # VISUAL REPRESENTATION
         self.pad = Shape(pad_vertices)
         self.terrain = Shape(terrain_vertices, (25, 25, 25))
         #self.terrain = Circle(self.DIAMETER/2, color = (100, 150, 255), line_color = (255, 0, 0))
+
+    def update_collisions(self):
+        bodies_to_check = [self.pad_poly]
+        def shape_colliding(arbiter, collisions):
+            for shape in collisions.keys():
+                if shape in arbiter.shapes:
+                    collisions[shape] = True
+        collisions = {body: False for body in bodies_to_check}
+        self.each_arbiter(shape_colliding, collisions)
+
+        self.collisions = [collisions[body] for body in bodies_to_check]
 
     def draw(self, display, camera):
         self.pad.draw(display, camera, self.position, self.angle)
@@ -255,17 +266,17 @@ class RocketLander(gym.Env):
     def __get_reward(self, obs):
         reward = 0
         shaping = (
-            - 500 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
+            - 1000 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
             - 100 * np.sqrt(obs[2] * obs[2] + obs[3] * obs[3])
             #- 100 * abs(obs[4])
-            + 30 * obs[6]
-            + 30 * obs[7]
+            + 10 * obs[6]
+            + 10 * obs[7]
         )
         if self.prev_shaping is not None:
             reward = shaping - self.prev_shaping
         self.prev_shaping = shaping
 
-        #reward -= self.rocket.thruster_power * 0.05
+        reward -= self.rocket.thruster_power * 0.05
 
         return reward
 
@@ -329,7 +340,7 @@ class RocketLander(gym.Env):
 
         terminated = False
         if (
-            self.rocket.collisions[0] or
+            self.rocket.collisions[0] or self.planet.collisions[0] or
             ((self.rocket.collisions[1] or self.rocket.collisions[2]) and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) > 2/100) or
             abs(observations[0]) > 1 or abs(observations[1]) >= 1
         ):
@@ -373,9 +384,7 @@ class RocketLander(gym.Env):
         self.rocket.thruster_vector = float(self.in_left) - float(self.in_right)
         self.rocket.thrust()
         self.rocket.update_collisions()
-        #observations = self.__get_observations()
-        ##print(observations)
-        #print("{0:0.2f}".format(self.__get_reward(observations)))
+        self.planet.update_collisions()
 
         self.space.step(dt)
 
@@ -396,6 +405,9 @@ class RocketLander(gym.Env):
             # logic
             dt = self.clock.tick(60)/1000
             self.handle_logic(dt)
+            observations = self.__get_observations()
+            #print(observations)
+            print("{0:0.2f}".format(self.__get_reward(observations)))
             # render
             self.camera.position = self.rocket.position
             self.render()

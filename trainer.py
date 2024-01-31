@@ -22,7 +22,7 @@ class Trainer:
     def train(self, timesteps, nenvs):
         envs = make_vec_env(RocketLander, n_envs=nenvs)
         if os.path.isfile(self.model_name+".zip"):
-            self.model = PPO.load(self.model_name+".zip")
+            self.model = Monitor(PPO.load(self.model_name+".zip"))
             self.model.set_env(envs)
             self.model.verbose = 1
             self.model_name += "v2"
