@@ -43,12 +43,12 @@ class Trainer:
         self.model.save(self.model_name)
 
     def test(self):
-        eval_env = Monitor(RocketLander(render_mode = "human"))
+        #eval_env = Monitor(RocketLander(render_mode = "human"))
+        eval_env = make_vec_env(RocketLander, n_envs=16)
         self.model = PPO.load(self.model_name+".zip")
 
-        mean_reward, std_reward = evaluate_policy(self.model, eval_env, n_eval_episodes=10, deterministic=True)
+        mean_reward, std_reward = evaluate_policy(self.model, eval_env, n_eval_episodes=32, deterministic=True)
         print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
-
 
 if __name__ == '__main__':
     args = get_arguments()
