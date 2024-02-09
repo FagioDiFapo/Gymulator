@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import pymunk
 import pygame
 import numpy as np
@@ -267,7 +267,7 @@ class RocketLander(gym.Env):
         reward = 0
         shaping = (
             - 1000 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
-            - 100 * np.sqrt(obs[2] * obs[2] + obs[3] * obs[3])
+            #- 100 * np.sqrt(obs[2] * obs[2] + obs[3] * obs[3])
             #- 100 * abs(obs[4])
             + 10 * obs[6]
             + 10 * obs[7]
@@ -293,7 +293,7 @@ class RocketLander(gym.Env):
         # GYM ELEMENTS
         self.action_space, self.observation_space = self.__get_spaces()
 
-    def __init__(self, render_mode = None, seed = rand.random()):
+    def __init__(self, render_mode = "human", seed = rand.random()):
         self.running = True
         self.screen = pygame.display.set_mode(self.WINDOW_RESOLUTION)
         self.clock = pygame.time.Clock()
@@ -345,10 +345,10 @@ class RocketLander(gym.Env):
             abs(observations[0]) > 1 or abs(observations[1]) >= 1
         ):
             terminated = True
-            reward = -100
+            reward = -100-100*np.sqrt(observations[2]*observations[2] + observations[3]*observations[3])
         if self.rocket.collisions[1] and self.rocket.collisions[2] and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) < 2/100:
             terminated = True
-            reward = +100
+            reward = +100-100*np.sqrt(observations[2]*observations[2] + observations[3]*observations[3])
 
         return np.array(observations, dtype=np.float32), reward, terminated, False, {}
 
