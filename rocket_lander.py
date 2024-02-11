@@ -129,7 +129,7 @@ class Rocket(pymunk.Body):
         self.body_poly = pymunk.Poly(self, self.booster.vertices)
         self.leg_poly_l = pymunk.Poly(self.leg_body_l, leg_vertices)
         self.leg_poly_r = pymunk.Poly(self.leg_body_r, self.leg_r.vertices)
-        self.body_poly.mass = self.EMPTY_MASS
+        self.body_poly.mass = (1-0.16)*self.EMPTY_MASS
         self.leg_poly_l.mass = 0.08*self.EMPTY_MASS
         self.leg_poly_r.mass = 0.08*self.EMPTY_MASS
         self.body_poly.friction = 0.6
