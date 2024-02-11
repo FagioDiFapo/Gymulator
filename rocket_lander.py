@@ -75,14 +75,6 @@ class Rocket(pymunk.Body):
         [x, y] = self.__bell_transform([x, y])
         return [x, y]
 
-    def __leg_transform(self, vertex, left):
-        factor = 1 if left else -1
-        angle = self.LEGS_ANGLE
-        [x, y] = vertex
-        [x, y] = [x*math.cos(factor*angle)-y*math.sin(factor*angle), x*math.sin(factor*angle) + y*math.cos(factor*angle)]
-        [x, y] = [x-self.WIDTH*factor/2, y+self.HEIGHT/2]
-        return [x, y]
-
     def __attitude_indicator_transform(self, vertex, scale):
         x = vertex[0]
         y = vertex[1]
@@ -120,24 +112,42 @@ class Rocket(pymunk.Body):
 
         # VISUAL REPRESENTATION
         self.booster = Shape(booster_vertices)
-        self.leg_l = Shape([self.__leg_transform(vertex, True) for vertex in leg_vertices], (50, 50, 50))
-        self.leg_r = Shape([self.__leg_transform(vertex, False) for vertex in leg_vertices], (50, 50, 50))
+        self.leg_l = Shape(leg_vertices, (50, 50, 50))
+        self.leg_r = Shape(leg_vertices, (50, 50, 50))
         self.bell = Shape([self.__bell_transform(vertex) for vertex in self.bell_vertices], (50, 50, 50))
         self.exhaust = Shape([self.__exhaust_transform(vertex) for vertex in self.exhaust_vertices], (255, 255, 50))
         self.attitude_indicator = Shape([self.__attitude_indicator_transform(vertex, 10) for vertex in self.attitude_indicator_vertices], (255, 50, 50))
 
         # PYSICAL REPRESENTATION
         super().__init__()
+        self.leg_body_l = pymunk.Body()
+        self.leg_body_r = pymunk.Body()
+
         self.position = [0,-50]
+        self.leg_body_l.position = self.position + [-hwidth, hheight]
+        self.leg_body_r.position = self.position + [hwidth, hheight]
         self.body_poly = pymunk.Poly(self, self.booster.vertices)
-        self.leg_poly_l = pymunk.Poly(self, self.leg_l.vertices)
-        self.leg_poly_r = pymunk.Poly(self, self.leg_r.vertices)
+        self.leg_poly_l = pymunk.Poly(self.leg_body_l, leg_vertices)
+        self.leg_poly_r = pymunk.Poly(self.leg_body_r, self.leg_r.vertices)
         self.body_poly.mass = self.EMPTY_MASS
+        self.leg_poly_l.mass = 0.08*self.EMPTY_MASS
+        self.leg_poly_r.mass = 0.08*self.EMPTY_MASS
         self.body_poly.friction = 0.6
         self.leg_poly_l.friction = 0.6
         self.leg_poly_r.friction = 0.6
 
-        space.add(self, self.body_poly, self.leg_poly_l, self.leg_poly_r)
+        pivot_leg_l = pymunk.constraints.PivotJoint(self, self.leg_body_l, [-hwidth, hheight], [0, 0])
+        pivot_leg_r = pymunk.constraints.PivotJoint(self, self.leg_body_r, [hwidth, hheight], [0, 0])
+        pivot_leg_l.collide_bodies = False
+        pivot_leg_r.collide_bodies = False
+        rotary_spring_leg_l =  pymunk.constraints.DampedRotarySpring(self, self.leg_body_l, -self.LEGS_ANGLE, 5000000, 50000)
+        rotary_spring_leg_r =  pymunk.constraints.DampedRotarySpring(self, self.leg_body_r, self.LEGS_ANGLE, 5000000, 50000)
+        rotary_limit_leg_l = pymunk.constraints.RotaryLimitJoint(self, self.leg_body_l, self.LEGS_ANGLE-math.pi/36, self.LEGS_ANGLE+math.pi/36)
+        rotary_limit_leg_r = pymunk.constraints.RotaryLimitJoint(self, self.leg_body_r, -self.LEGS_ANGLE-math.pi/36, -self.LEGS_ANGLE+math.pi/36)
+
+        space.add(self, self.body_poly)
+        space.add(self.leg_body_l, self.leg_poly_l, self.leg_body_r, self.leg_poly_r)
+        space.add(pivot_leg_l, pivot_leg_r, rotary_spring_leg_l, rotary_spring_leg_r, rotary_limit_leg_l, rotary_limit_leg_r)
 
     def thrust(self):
         angle = self.MAX_THRUSTER_ANGLE*self.thruster_vector
@@ -153,9 +163,9 @@ class Rocket(pymunk.Body):
         self.attitude_indicator.draw(display, camera, self.position, self.angle)
         self.exhaust.draw(display, camera, self.position, self.angle)
         self.bell.draw(display, camera, self.position, self.angle)
-        self.leg_l.draw(display, camera, self.position, self.angle)
-        self.leg_r.draw(display, camera, self.position, self.angle)
         self.booster.draw(display, camera, self.position, self.angle)
+        self.leg_l.draw(display, camera, self.leg_body_l.position,  self.leg_body_l.angle)
+        self.leg_r.draw(display, camera,  self.leg_body_r.position,  self.leg_body_r.angle)
 
 class Planet(pymunk.Body):
     PAD_WIDTH = 86 #m
@@ -290,6 +300,8 @@ class RocketLander(gym.Env):
         self.rocket = Rocket(self.space)
         self.planet = Planet(self.space)
         self.rocket.position = [rand.uniform(-100., 100.), rand.uniform(-200., -100.)]
+        self.rocket.leg_body_l.position = self.rocket.position + [-self.rocket.WIDTH/2, self.rocket.HEIGHT/2]
+        self.rocket.leg_body_r.position = self.rocket.position + [-self.rocket.WIDTH/2, self.rocket.HEIGHT/2]
         # GYM ELEMENTS
         self.action_space, self.observation_space = self.__get_spaces()
 
