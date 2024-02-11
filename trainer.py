@@ -10,7 +10,7 @@ import argparse
 def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", help="Execution mode between train or test", type=str, choices=["train","test"])
-    parser.add_argument("-model_name", help="Name of the model you want to train/test", default="ppo-RocketLander", type=str)
+    parser.add_argument("-n", "--model_name", help="Name of the model you want to train/test", default="ppo-RocketLander", type=str)
 
     return parser.parse_args()
 
@@ -47,7 +47,7 @@ class Trainer:
         eval_env = make_vec_env(RocketLander, n_envs=16)
         self.model = PPO.load(self.model_name+".zip")
 
-        mean_reward, std_reward = evaluate_policy(self.model, eval_env, n_eval_episodes=32, deterministic=True)
+        mean_reward, std_reward = evaluate_policy(self.model, eval_env, n_eval_episodes=64, deterministic=True)
         print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
 
 if __name__ == '__main__':
@@ -55,6 +55,6 @@ if __name__ == '__main__':
     trainer = Trainer(args.model_name)
 
     if args.mode == "train":
-        trainer.train(1000000, 16)
+        trainer.train(5000000, 16)
     elif args.mode == "test":
         trainer.test()
