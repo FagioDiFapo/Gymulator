@@ -187,11 +187,11 @@ class Planet(pymunk.Body):
         # PYSICAL REPRESENTATION
         super().__init__(body_type= pymunk.Body.STATIC)
         self.position = [0,-hheight]
-        self.pad_poly = pymunk.Poly(self,pad_vertices)
-        terrain_poly = pymunk.Poly(self, terrain_vertices)
-        self.pad_poly.friction = 0.6
-        terrain_poly.friction = 0.6
-        space.add(self, self.pad_poly, terrain_poly)
+        pad_poly = pymunk.Poly(self,pad_vertices)
+        self.terrain_poly = pymunk.Poly(self, terrain_vertices)
+        pad_poly.friction = 0.6
+        self.terrain_poly.friction = 0.6
+        space.add(self, pad_poly, self.terrain_poly)
 
         # VISUAL REPRESENTATION
         self.pad = Shape(pad_vertices)
@@ -199,7 +199,7 @@ class Planet(pymunk.Body):
         #self.terrain = Circle(self.DIAMETER/2, color = (100, 150, 255), line_color = (255, 0, 0))
 
     def update_collisions(self):
-        bodies_to_check = [self.pad_poly]
+        bodies_to_check = [self.terrain_poly]
         def shape_colliding(arbiter, collisions):
             for shape in collisions.keys():
                 if shape in arbiter.shapes:
@@ -225,6 +225,7 @@ class RocketLander(gym.Env):
     camera = Camera([10, 10], WINDOW_RESOLUTION, RENDER_SCALE)
     # SIMULATION SETTINGS
     FPS = 60
+    COMMITMENT_TIME = 5 #amount of seconds after a landing is considered valid
 
     # USER INPUTS
     in_left = False
@@ -276,16 +277,16 @@ class RocketLander(gym.Env):
 
         return observations
 
-    def __get_reward(self):
+    def __get_reward(self, delta_time):
         reward = 0
-        r_pos = self.rocket.position
+        r_pos = self.rocket.position + [0,self.rocket.HEIGHT/2]
         r_vel = self.rocket.velocity
         shaping = (
             - 1000 * np.sqrt(r_pos[0] * r_pos[0] + r_pos[1] * r_pos[1])
             #- 100 * np.sqrt(obs[2] * obs[2] + obs[3] * obs[3])
             #- 100 * abs(obs[4])
-            + 100 * self.rocket.collisions[1]
-            + 100 * self.rocket.collisions[2]
+            + 1000 * self.rocket.collisions[1]
+            + 1000 * self.rocket.collisions[2]
         )
         if self.prev_shaping is not None:
             reward = shaping - self.prev_shaping
@@ -293,11 +294,32 @@ class RocketLander(gym.Env):
 
         reward -= self.rocket.thruster_power * 0.05
 
-        return reward
+        terminated = False
+        velocity = np.sqrt(r_vel[0]*r_vel[0] + r_vel[1]*r_vel[1])
+        if (
+            self.rocket.collisions[0] or self.planet.collisions[0] or
+            ((self.rocket.collisions[1] or self.rocket.collisions[2]) and velocity > 5) or
+            abs(r_pos[0]) > 500 or abs(r_pos[1]) > 500
+        ):
+            terminated = True
+            print("womp womp")
+            reward = -1000-100*velocity
+        if self.rocket.collisions[1] and self.rocket.collisions[2] and velocity < 5:
+            if self.contact_time > self.COMMITMENT_TIME:
+                terminated = True
+                print("yipee")
+            else:
+                self.contact_time += delta_time
+            reward = +1000-100*velocity
+        else:
+            self.contact_time = 0.
+
+        return reward, terminated
 
     def __init_landing_scenario(self, seed):
         rand.seed(seed)
         # SIMULATION ELEMENTS
+        self.contact_time = 0.
         self.prev_shaping = None
         self.space = pymunk.Space()
         self.space.gravity = [0,9.81]
@@ -325,32 +347,22 @@ class RocketLander(gym.Env):
         return self.step(0)[0], {}
 
     def step(self, action):
-        self.handle_inputs(action)
         # TRANSLATE MODEL ACTION TO CONTROL INPUTS
+        self.handle_inputs(action)
 
         # RUN SIMULATION STEP
-        self.handle_logic(self.clock.tick(self.FPS)/1000 if self.render_mode == "human" else 2/(3*self.FPS))
+        delta_time = self.clock.tick(self.FPS)/1000 if self.render_mode == "human" else 2/(3*self.FPS)
+        self.handle_logic(delta_time)
 
         # CALCULATE OBSERVATIONS
         observations = self.__get_observations()
 
         # CALCULATE REWARD
-        reward = self.__get_reward()
+        reward, terminated = self.__get_reward(delta_time)
 
         if self.render_mode in ["human", "fast"]:
+            self.camera.position = self.LANDER_INSTANCES[0].rocket.position
             self.render()
-
-        terminated = False
-        if (
-            self.rocket.collisions[0] or self.planet.collisions[0] or
-            ((self.rocket.collisions[1] or self.rocket.collisions[2]) and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) > 2/100) or
-            abs(observations[0]) > 1 or abs(observations[1]) >= 1
-        ):
-            terminated = True
-            reward = -100-100*np.sqrt(observations[2]*observations[2] + observations[3]*observations[3])
-        if self.rocket.collisions[1] and self.rocket.collisions[2] and np.sqrt(observations[2]*observations[2] + observations[3]*observations[3]) < 2/100:
-            terminated = True
-            reward = +100-100*np.sqrt(observations[2]*observations[2] + observations[3]*observations[3])
 
         return np.array(observations, dtype=np.float32), reward, terminated, False, {}
 
@@ -420,19 +432,11 @@ class RocketLander(gym.Env):
     def run(self):
         pygame.init()
         while self.running:
-            # inputs
-            self.handle_inputs(None)
-            # logic
-            dt = self.clock.tick(60)/1000
-            self.handle_logic(dt)
-            #observations = self.__get_observations()
-            #print(observations)
-            #print("{0:0.2f}".format(self.__get_reward(observations)))
-            # render
-            self.camera.position = self.rocket.position
-            self.render()
+            [_, reward, terminated, _, _] = self.step(None)
+            #print(reward)
+            if terminated: self.reset()
         pygame.quit()
 
 if __name__ == "__main__":
-    lander = RocketLander()
+    lander = RocketLander(render_mode = "human")
     lander.run()
