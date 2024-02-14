@@ -257,10 +257,10 @@ class RocketLander(gym.Env):
             # legs in contact
             1.0,1.0,
         ]).astype(np.float32)
-        observation_space = spaces.Box(low, high)
+        observation_space = gym.spaces.box.Box(low, high)
 
         # Nothing, thrust straight, thrust left and thrust right
-        action_space = spaces.Discrete(4)
+        action_space = gym.spaces.discrete.Discrete(4)
 
         return action_space, observation_space
 
@@ -302,12 +302,12 @@ class RocketLander(gym.Env):
             abs(r_pos[0]) > 500 or abs(r_pos[1]) > 500
         ):
             terminated = True
-            print("womp womp")
+            #print("womp womp")
             reward = -1000-100*velocity
         if self.rocket.collisions[1] and self.rocket.collisions[2] and velocity < 5:
             if self.contact_time > self.COMMITMENT_TIME:
                 terminated = True
-                print("yipee")
+                #print("yipee")
             else:
                 self.contact_time += delta_time
             reward = +1000-100*velocity
