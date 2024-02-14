@@ -76,22 +76,22 @@ class Rocket(pymunk.Body):
         return [x, y]
 
     def __attitude_indicator_transform(self, vertex, scale):
-        x = vertex[0]
-        y = vertex[1]
         indicator_size = self.ATTITUDE_INDICATOR_SCALE
+        [x, y] = vertex
         [x, y] = [indicator_size*x/scale, indicator_size*y/scale]
         return [x, y]
 
     def update_collisions(self):
-        bodies_to_check = [self.body_poly, self.leg_poly_l, self.leg_poly_r]
-        def shape_colliding(arbiter, collisions):
-            for shape in collisions.keys():
-                if shape in arbiter.shapes:
-                    collisions[shape] = True
-        collisions = {body: False for body in bodies_to_check}
-        self.each_arbiter(shape_colliding, collisions)
+        _bodies = [self.body_poly, self.leg_poly_l, self.leg_poly_r]
+        def shape_colliding(arbiter, shape, collisions):
+            if shape in arbiter.shapes:
+                collisions[shape] = True
+        collisions = {body: False for body in _bodies}
+        self.each_arbiter(shape_colliding, _bodies[0], collisions)
+        self.leg_body_l.each_arbiter(shape_colliding, _bodies[1], collisions)
+        self.leg_body_r.each_arbiter(shape_colliding, _bodies[2], collisions)
 
-        self.collisions = [collisions[body] for body in bodies_to_check]
+        self.collisions = [collisions[body] for body in _bodies]
 
     def __init__(self, space):
         # RUNTIME VARIABLES
@@ -136,6 +136,7 @@ class Rocket(pymunk.Body):
         self.leg_poly_l.friction = 0.6
         self.leg_poly_r.friction = 0.6
 
+        # landing leg constraints
         pivot_leg_l = pymunk.constraints.PivotJoint(self, self.leg_body_l, [-hwidth, hheight], [0, 0])
         pivot_leg_r = pymunk.constraints.PivotJoint(self, self.leg_body_r, [hwidth, hheight], [0, 0])
         pivot_leg_l.collide_bodies = False
@@ -222,6 +223,8 @@ class RocketLander(gym.Env):
     WINDOW_RESOLUTION = [1000, 700]
     RENDER_SCALE = 2 #in pixels per meter
     camera = Camera([10, 10], WINDOW_RESOLUTION, RENDER_SCALE)
+    # SIMULATION SETTINGS
+    FPS = 60
 
     # USER INPUTS
     in_left = False
@@ -230,7 +233,7 @@ class RocketLander(gym.Env):
 
     def __get_spaces(self):
         low = np.array([
-            # distance from target
+            # relative position from target
             -1.5,-1.5,
             # relative velocity
             -1.5,-1.5,
@@ -242,7 +245,7 @@ class RocketLander(gym.Env):
             0.0,0.0,
         ]).astype(np.float32)
         high = np.array([
-            # distance from target
+            # relative position from target
             1.5,1.5,
             # relative velocity
             1.5,1.5,
@@ -273,14 +276,16 @@ class RocketLander(gym.Env):
 
         return observations
 
-    def __get_reward(self, obs):
+    def __get_reward(self):
         reward = 0
+        r_pos = self.rocket.position
+        r_vel = self.rocket.velocity
         shaping = (
-            - 1000 * np.sqrt(obs[0] * obs[0] + obs[1] * obs[1])
+            - 1000 * np.sqrt(r_pos[0] * r_pos[0] + r_pos[1] * r_pos[1])
             #- 100 * np.sqrt(obs[2] * obs[2] + obs[3] * obs[3])
             #- 100 * abs(obs[4])
-            + 10 * obs[6]
-            + 10 * obs[7]
+            + 100 * self.rocket.collisions[1]
+            + 100 * self.rocket.collisions[2]
         )
         if self.prev_shaping is not None:
             reward = shaping - self.prev_shaping
@@ -293,19 +298,18 @@ class RocketLander(gym.Env):
     def __init_landing_scenario(self, seed):
         rand.seed(seed)
         # SIMULATION ELEMENTS
-        self.elapsed_time = 0
         self.prev_shaping = None
         self.space = pymunk.Space()
         self.space.gravity = [0,9.81]
-        self.rocket = Rocket(self.space)
         self.planet = Planet(self.space)
+        self.rocket = Rocket(self.space)
         self.rocket.position = [rand.uniform(-100., 100.), rand.uniform(-200., -100.)]
         self.rocket.leg_body_l.position = self.rocket.position + [-self.rocket.WIDTH/2, self.rocket.HEIGHT/2]
-        self.rocket.leg_body_r.position = self.rocket.position + [-self.rocket.WIDTH/2, self.rocket.HEIGHT/2]
+        self.rocket.leg_body_r.position = self.rocket.position + [self.rocket.WIDTH/2, self.rocket.HEIGHT/2]
         # GYM ELEMENTS
         self.action_space, self.observation_space = self.__get_spaces()
 
-    def __init__(self, render_mode = "human", seed = rand.random()):
+    def __init__(self, render_mode = None, seed = rand.random()):
         self.running = True
         self.screen = pygame.display.set_mode(self.WINDOW_RESOLUTION)
         self.clock = pygame.time.Clock()
@@ -318,37 +322,23 @@ class RocketLander(gym.Env):
     def reset(self, *, seed = None, options = None):
         super().reset(seed=seed)
         self.__init_landing_scenario(seed)
-        self.elapsed_time = 0
         return self.step(0)[0], {}
 
     def step(self, action):
+        self.handle_inputs(action)
         # TRANSLATE MODEL ACTION TO CONTROL INPUTS
-        self.in_left, self.in_right, self.in_up = False, False, False
-        match action:
-            case 1:
-                self.in_up = True
-            case 2:
-                self.in_up = True
-                self.in_left = True
-            case 3:
-                self.in_up = True
-                self.in_right = True
 
         # RUN SIMULATION STEP
-        if self.render_mode == "human": dt = self.clock.tick(60)/1000
-        else: dt = 1/50 #SPF
-        self.handle_logic(dt)
-        self.elapsed_time += dt
+        self.handle_logic(self.clock.tick(self.FPS)/1000 if self.render_mode == "human" else 2/(3*self.FPS))
 
         # CALCULATE OBSERVATIONS
         observations = self.__get_observations()
 
         # CALCULATE REWARD
-        reward = self.__get_reward(observations)
+        reward = self.__get_reward()
 
-        self.handle_events(False)
-        #if self.render_mode == "human":
-        self.render()
+        if self.render_mode in ["human", "fast"]:
+            self.render()
 
         terminated = False
         if (
@@ -365,7 +355,7 @@ class RocketLander(gym.Env):
         return np.array(observations, dtype=np.float32), reward, terminated, False, {}
 
     # GAME FUNCTIONS
-    def handle_events(self, human):
+    def handle_inputs(self, action):
         for event in pygame.event.get():
             match event.type:
                 case pygame.QUIT:
@@ -373,7 +363,7 @@ class RocketLander(gym.Env):
                 case pygame.MOUSEWHEEL:
                     self.camera.scale *= 1.1 if event.y > 0 else 0.9
                 case pygame.KEYDOWN:
-                    if human:
+                    if not action:
                         match event.key:
                             case pygame.K_a:
                                 self.in_left = True
@@ -382,7 +372,7 @@ class RocketLander(gym.Env):
                             case pygame.K_w:
                                 self.in_up = True
                 case pygame.KEYUP:
-                    if human:
+                    if not action:
                         match event.key:
                             case pygame.K_a:
                                 self.in_left = False
@@ -390,6 +380,24 @@ class RocketLander(gym.Env):
                                 self.in_right = False
                             case pygame.K_w:
                                 self.in_up = False
+        if action:
+            match action:
+                case 0:
+                    self.in_left = False
+                    self.in_right = False
+                    self.in_up = False
+                case 1:
+                    self.in_up = True
+                    self.in_left = False
+                    self.in_right = False
+                case 2:
+                    self.in_up = True
+                    self.in_left = True
+                    self.in_right = False
+                case 3:
+                    self.in_up = True
+                    self.in_left = False
+                    self.in_right = True
 
     def handle_logic(self, dt):
         self.rocket.thruster_power = float(self.in_up)
@@ -413,7 +421,7 @@ class RocketLander(gym.Env):
         pygame.init()
         while self.running:
             # inputs
-            self.handle_events(True)
+            self.handle_inputs(None)
             # logic
             dt = self.clock.tick(60)/1000
             self.handle_logic(dt)
