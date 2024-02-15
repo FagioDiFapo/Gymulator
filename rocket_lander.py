@@ -282,11 +282,11 @@ class RocketLander(gym.Env):
         r_pos = self.rocket.position + [0,self.rocket.HEIGHT/2]
         r_vel = self.rocket.velocity
         shaping = (
-            - 1000 * np.sqrt(r_pos[0] * r_pos[0] + r_pos[1] * r_pos[1])
-            #- 100 * np.sqrt(obs[2] * obs[2] + obs[3] * obs[3])
+            - 1000 * np.sqrt(r_pos[0]/500 * r_pos[0]/500 + r_pos[1]/500 * r_pos[1]/500)
+            #- 1000 * np.sqrt(r_vel[0] * r_vel[0] + r_vel[1] * r_vel[1])
             #- 100 * abs(obs[4])
-            + 1000 * self.rocket.collisions[1]
-            + 1000 * self.rocket.collisions[2]
+            + 100 * self.rocket.collisions[1]
+            + 100 * self.rocket.collisions[2]
         )
         if self.prev_shaping is not None:
             reward = shaping - self.prev_shaping
@@ -331,7 +331,7 @@ class RocketLander(gym.Env):
         # GYM ELEMENTS
         self.action_space, self.observation_space = self.__get_spaces()
 
-    def __init__(self, render_mode = None, seed = rand.random()):
+    def __init__(self, render_mode = 'fast', seed = rand.random()):
         self.running = True
         self.screen = pygame.display.set_mode(self.WINDOW_RESOLUTION)
         self.clock = pygame.time.Clock()
@@ -361,7 +361,8 @@ class RocketLander(gym.Env):
         reward, terminated = self.__get_reward(delta_time)
 
         if self.render_mode in ["human", "fast"]:
-            self.camera.position = self.LANDER_INSTANCES[0].rocket.position
+            if self.render_mode == "human":
+                self.camera.position = self.LANDER_INSTANCES[0].rocket.position
             self.render()
 
         return np.array(observations, dtype=np.float32), reward, terminated, False, {}
@@ -375,7 +376,7 @@ class RocketLander(gym.Env):
                 case pygame.MOUSEWHEEL:
                     self.camera.scale *= 1.1 if event.y > 0 else 0.9
                 case pygame.KEYDOWN:
-                    if not action:
+                    if action == None:
                         match event.key:
                             case pygame.K_a:
                                 self.in_left = True
@@ -384,7 +385,7 @@ class RocketLander(gym.Env):
                             case pygame.K_w:
                                 self.in_up = True
                 case pygame.KEYUP:
-                    if not action:
+                    if action == None:
                         match event.key:
                             case pygame.K_a:
                                 self.in_left = False
@@ -392,7 +393,7 @@ class RocketLander(gym.Env):
                                 self.in_right = False
                             case pygame.K_w:
                                 self.in_up = False
-        if action:
+        if action != None:
             match action:
                 case 0:
                     self.in_left = False
