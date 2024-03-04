@@ -5,7 +5,6 @@ import numpy as np
 import math
 import random as rand
 
-from gym import spaces
 
 class Camera:
 
@@ -223,6 +222,7 @@ class RocketLander(gym.Env):
     WINDOW_RESOLUTION = [1000, 700]
     RENDER_SCALE = 2 #in pixels per meter
     camera = Camera([10, 10], WINDOW_RESOLUTION, RENDER_SCALE)
+    RENDER_TOGGLE = True
     # SIMULATION SETTINGS
     FPS = 60
     COMMITMENT_TIME = 5 #amount of seconds after a landing is considered valid
@@ -265,10 +265,10 @@ class RocketLander(gym.Env):
         return action_space, observation_space
 
     def __get_observations(self):
-        r_pos = self.rocket.position
+        t_pos = -self.rocket.position
         r_vel = self.rocket.velocity
         observations = [
-            r_pos[0]/500, r_pos[1]/500,
+            t_pos[0]/500, t_pos[1]/500,
             r_vel[0]/100, r_vel[1]/100,
             self.rocket.angle,
             self.rocket.angular_velocity,
@@ -279,38 +279,41 @@ class RocketLander(gym.Env):
 
     def __get_reward(self, delta_time):
         reward = 0
-        r_pos = self.rocket.position + [0,self.rocket.HEIGHT/2]
+        t_pos = -self.rocket.position - [0,self.rocket.HEIGHT/2]
         r_vel = self.rocket.velocity
         shaping = (
-            - 1000 * np.sqrt(r_pos[0]/500 * r_pos[0]/500 + r_pos[1]/500 * r_pos[1]/500)
+            - 1000 * np.sqrt(t_pos[0]/500 * t_pos[0]/500 + t_pos[1]/500 * t_pos[1]/500)
             #- 1000 * np.sqrt(r_vel[0] * r_vel[0] + r_vel[1] * r_vel[1])
             #- 100 * abs(obs[4])
-            + 100 * self.rocket.collisions[1]
-            + 100 * self.rocket.collisions[2]
+            + 10 * self.rocket.collisions[1]
+            + 10 * self.rocket.collisions[2]
         )
         if self.prev_shaping is not None:
             reward = shaping - self.prev_shaping
         self.prev_shaping = shaping
 
-        reward -= self.rocket.thruster_power * 0.05
+        reward -= self.rocket.thruster_power * 100
 
         terminated = False
         velocity = np.sqrt(r_vel[0]*r_vel[0] + r_vel[1]*r_vel[1])
         if (
             self.rocket.collisions[0] or self.planet.collisions[0] or
             ((self.rocket.collisions[1] or self.rocket.collisions[2]) and velocity > 5) or
-            abs(r_pos[0]) > 500 or abs(r_pos[1]) > 500
+            abs(t_pos[0]) > 500 or abs(t_pos[1]) > 500
         ):
             terminated = True
             #print("womp womp")
-            reward = -1000-100*velocity
+            if self.rocket.collisions[0] or self.planet.collisions[0]:
+                reward += -1000
+            reward += -1000#-100*velocity
         if self.rocket.collisions[1] and self.rocket.collisions[2] and velocity < 5:
             if self.contact_time > self.COMMITMENT_TIME:
                 terminated = True
+                reward += +1000
                 #print("yipee")
             else:
                 self.contact_time += delta_time
-            reward = +1000-100*velocity
+            reward += +100#-100*velocity
         else:
             self.contact_time = 0.
 
@@ -360,7 +363,7 @@ class RocketLander(gym.Env):
         # CALCULATE REWARD
         reward, terminated = self.__get_reward(delta_time)
 
-        if self.render_mode in ["human", "fast"]:
+        if self.render_mode in ["human", "fast"] and self.RENDER_TOGGLE:
             if self.render_mode == "human":
                 self.camera.position = self.LANDER_INSTANCES[0].rocket.position
             self.render()
@@ -369,30 +372,33 @@ class RocketLander(gym.Env):
 
     # GAME FUNCTIONS
     def handle_inputs(self, action):
-        for event in pygame.event.get():
-            match event.type:
-                case pygame.QUIT:
-                    self.running = False
-                case pygame.MOUSEWHEEL:
-                    self.camera.scale *= 1.1 if event.y > 0 else 0.9
-                case pygame.KEYDOWN:
-                    if action == None:
-                        match event.key:
-                            case pygame.K_a:
-                                self.in_left = True
-                            case pygame.K_d:
-                                self.in_right = True
-                            case pygame.K_w:
-                                self.in_up = True
-                case pygame.KEYUP:
-                    if action == None:
-                        match event.key:
-                            case pygame.K_a:
-                                self.in_left = False
-                            case pygame.K_d:
-                                self.in_right = False
-                            case pygame.K_w:
-                                self.in_up = False
+        if self == self.LANDER_INSTANCES[0]:
+            for event in pygame.event.get():
+                match event.type:
+                    case pygame.QUIT:
+                        self.running = False
+                    case pygame.MOUSEWHEEL:
+                        self.camera.scale *= 1.1 if event.y > 0 else 0.9
+                    case pygame.KEYDOWN:
+                        if action == None:
+                            match event.key:
+                                case pygame.K_a:
+                                    self.in_left = True
+                                case pygame.K_d:
+                                    self.in_right = True
+                                case pygame.K_w:
+                                    self.in_up = True
+                    case pygame.KEYUP:
+                        if action == None:
+                            match event.key:
+                                case pygame.K_a:
+                                    self.in_left = False
+                                case pygame.K_d:
+                                    self.in_right = False
+                                case pygame.K_w:
+                                    self.in_up = False
+                        if event.key == pygame.K_SPACE:
+                            self.RENDER_TOGGLE = not self.RENDER_TOGGLE
         if action != None:
             match action:
                 case 0:

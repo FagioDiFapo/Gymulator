@@ -1,5 +1,4 @@
 import os
-import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -55,6 +54,6 @@ if __name__ == '__main__':
     trainer = Trainer(args.model_name)
 
     if args.mode == "train":
-        trainer.train(5000000, 16)
+        trainer.train(7000000, 16)
     elif args.mode == "test":
         trainer.test()
