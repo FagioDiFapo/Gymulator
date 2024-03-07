@@ -265,7 +265,7 @@ class RocketLander(gym.Env):
         return action_space, observation_space
 
     def __get_observations(self):
-        t_pos = -self.rocket.position
+        t_pos = -self.rocket.position - [0,self.rocket.HEIGHT/2]
         r_vel = self.rocket.velocity
         observations = [
             t_pos[0]/500, t_pos[1]/500,
@@ -282,17 +282,17 @@ class RocketLander(gym.Env):
         t_pos = -self.rocket.position - [0,self.rocket.HEIGHT/2]
         r_vel = self.rocket.velocity
         shaping = (
-            - 1000 * np.sqrt(t_pos[0]/500 * t_pos[0]/500 + t_pos[1]/500 * t_pos[1]/500)
+            - 500 * np.sqrt(t_pos[0]/500 * t_pos[0]/500 + t_pos[1]/500 * t_pos[1]/500)
             #- 1000 * np.sqrt(r_vel[0] * r_vel[0] + r_vel[1] * r_vel[1])
             #- 100 * abs(obs[4])
-            + 10 * self.rocket.collisions[1]
-            + 10 * self.rocket.collisions[2]
+            + 100 * self.rocket.collisions[1]
+            + 100 * self.rocket.collisions[2]
         )
         if self.prev_shaping is not None:
             reward = shaping - self.prev_shaping
         self.prev_shaping = shaping
 
-        reward -= self.rocket.thruster_power * 100
+        #reward -= self.rocket.thruster_power * 100
 
         terminated = False
         velocity = np.sqrt(r_vel[0]*r_vel[0] + r_vel[1]*r_vel[1])
@@ -303,9 +303,7 @@ class RocketLander(gym.Env):
         ):
             terminated = True
             #print("womp womp")
-            if self.rocket.collisions[0] or self.planet.collisions[0]:
-                reward += -1000
-            reward += -1000#-100*velocity
+            reward += -velocity
         if self.rocket.collisions[1] and self.rocket.collisions[2] and velocity < 5:
             if self.contact_time > self.COMMITMENT_TIME:
                 terminated = True
@@ -313,7 +311,7 @@ class RocketLander(gym.Env):
                 #print("yipee")
             else:
                 self.contact_time += delta_time
-            reward += +100#-100*velocity
+                reward += +100-velocity
         else:
             self.contact_time = 0.
 
